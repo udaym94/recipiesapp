@@ -1,19 +1,25 @@
 const {
-    join,
+    join, resolve
 } = require('path');
 const Koa = require('koa');
 const Router = require('koa-router');
 const KoaBody = require('koa-body');
 const render = require('koa-ejs');
+const { promisify } = require('util');
+const { stat, readdir } = require('fs');
 
-// globa module import
+// global module import
 _ = require('underscore');
 require('dotenv').config();
 
 // additional file requires
 const config = require(join(__dirname, 'app', 'config'));
 const getPort = config.getPort;
+global.generateUrl = generateUrl = (route_name, route_param = {}) => router.use(route_name, route_param);
+global.getAdminFolderName = config.getAdminFolderName;
+global.getApiFolderName = config.getApiFolderName;
 
+console.log('22', getAdminFolderName, getApiFolderName);
 // koa app instance
 const app = new Koa();
 // Instatntiate Router
@@ -21,10 +27,12 @@ const router = new Router();
 // render configuration
 render(app, {
     root: join(__dirname, 'app', 'views'),
-    layout: 'layouts/',
+    layout: false,
     viewExt: 'html',
     cache: false,
-    debug: true
+    compileDebug: true,
+    // debug: true,
+    async: true
 });
 
 /**
@@ -55,6 +63,18 @@ const onError = (error) => {
     }
 }
 
+// Helper functions
+async function isDirectory(f) {
+    return (await promisify(stat)(f)).isDirectory();
+}
+async function _readdir(filePath) {
+    const files = await Promise.all((await promisify(readdir)(filePath)).map(async f => {
+        const fullPath = join(filePath, f);
+        return (await isDirectory(fullPath)) ? await readdir(fullPath) : fullPath;
+    }))
+    return _.flatten(files);
+}
+
 // Middleware
 app.use(KoaBody());
 app.use(router.routes());
@@ -65,11 +85,23 @@ app.use(async (ctx, next) => {
     const ms = Date.now() - start;
     console.log(`${ctx.method} ${ctx.url} - ${ms}ms`);
 });
-
-router.get('/', (ctx, next) => {
-    ctx.body = "Welcome to recipies app"
-    next();
+app.use(async (ctx, next) => {
+    const apiFiles = await _readdir(`./app/routes/${getApiFolderName}`);
+    apiFiles.forEach(file => {
+        if (!file && file[0] == '.') return;
+        require(join(__dirname, file)) ({ router });
+    });
+    const adminFiles = await _readdir(`./app/routes/${getAdminFolderName}`);
+    adminFiles.forEach(file => {
+        if (!file && file[0] == '.') return;
+        require(join(__dirname, file)) ({ router });
+    });
+    console.log('99', JSON.stringify(router, null, 2));
 });
+// router.get('/', (ctx, next) => {
+//     ctx.body = "Welcome to recipies app"
+//     next();
+// });
 
 if (!module.parent) {
     app.listen(getPort);
