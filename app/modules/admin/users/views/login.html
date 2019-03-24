@@ -1,0 +1,16 @@
+<%- include( admin_layout_folder +'/loginlayout.html' ) %>
+<div class="row">
+    <div class="col-md-4 offset-md-4">
+        <form role="form" method="POST" action="/admin/authenticate">
+            <div class="form-group">
+                <input type="text" name="email" placeholder="Enter Email" class="form-control">
+            </div>
+            <div class="form-group">
+                <input type="password" name="password" placeholder="Enter Password" class="form-control">
+            </div>
+            <div class="form-group">
+                <button class="form-control btn btn-dark">Log In</button>
+            </div>
+        </form>
+    </div>
+</div>

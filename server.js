@@ -3,7 +3,9 @@ const {
 } = require('path');
 const Koa = require('koa');
 const Router = require('koa-router');
-const KoaBody = require('koa-body');
+const bodyParser = require('koa-bodyparser');
+const session = require('koa-session');
+const passport = require('koa-passport');
 const render = require('koa-ejs');
 const { promisify } = require('util');
 const { stat, readdir } = require('fs');
@@ -11,28 +13,33 @@ const { stat, readdir } = require('fs');
 // global module import
 _ = require('underscore');
 require('dotenv').config();
+require('app-module-path').addPath(join(__dirname, 'app', 'modules'));
 
 // additional file requires
 const config = require(join(__dirname, 'app', 'config'));
+require(join(__dirname, 'app', 'database'))();
 const getPort = config.getPort;
 global.generateUrl = generateUrl = (route_name, route_param = {}) => router.use(route_name, route_param);
 global.getAdminFolderName = config.getAdminFolderName;
-global.getApiFolderName = config.getApiFolderName;
+global.getFrontFolderName = config.getFrontFolderName;
+global.front_layout_folder = join(__dirname, 'app', 'views', 'layouts', 'front');
+global.admin_layout_folder = join(__dirname, 'app', 'views', 'layouts', 'admin');
+global.front_partials_directory = join(__dirname, 'app', 'views', 'partials', 'front');
+global.admin_partials_directory = join(__dirname, 'app', 'views', 'partials', 'admin');
 
-console.log('22', getAdminFolderName, getApiFolderName);
 // koa app instance
 const app = new Koa();
 // Instatntiate Router
 const router = new Router();
 // render configuration
 render(app, {
-    root: join(__dirname, 'app', 'views'),
+    root: join(__dirname, 'app', 'modules'),
     layout: false,
     viewExt: 'html',
     cache: false,
     compileDebug: true,
     // debug: true,
-    async: true
+    // async: true
 });
 
 /**
@@ -76,7 +83,12 @@ async function _readdir(filePath) {
 }
 
 // Middleware
-app.use(KoaBody());
+app.use(bodyParser()); //bodyparser middleware
+app.keys = ['secret'];
+app.use(session({}, app)); //session middleware
+app.use(passport.initialize())
+app.use(passport.session())
+
 app.use(router.routes());
 app.use(router.allowedMethods());
 app.use(async (ctx, next) => {
@@ -86,8 +98,8 @@ app.use(async (ctx, next) => {
     console.log(`${ctx.method} ${ctx.url} - ${ms}ms`);
 });
 app.use(async (ctx, next) => {
-    const apiFiles = await _readdir(`./app/routes/${getApiFolderName}`);
-    apiFiles.forEach(file => {
+    const frontFiles = await _readdir(`./app/routes/${getFrontFolderName}`);
+    frontFiles.forEach(file => {
         if (!file && file[0] == '.') return;
         require(join(__dirname, file)) ({ router });
     });
@@ -96,7 +108,7 @@ app.use(async (ctx, next) => {
         if (!file && file[0] == '.') return;
         require(join(__dirname, file)) ({ router });
     });
-    console.log('99', JSON.stringify(router, null, 2));
+    // console.log('99', JSON.stringify(router, null, 2));
 });
 // router.get('/', (ctx, next) => {
 //     ctx.body = "Welcome to recipies app"
